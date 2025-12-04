@@ -21,35 +21,27 @@
 
 Библиотека `Radar2450` является расширением для библиотеки `HLK-LD2450` и требует ее установки. Датчик `HLK-LD2450` работает на частоте 24 ГГц и использует последовательное соединение на скорости 256000 бод. Рекомендуется использовать микроконтроллеры с аппаратным UART для стабильной работы.
 
+
 ## API
 
 ### Инициализация
 
-```cpp
-void begin(int rx_pin, int tx_pin, long baud_rate = 256000);
-```cpp
-### Конфигурация
+Метод `begin` инициализирует радар с указанием пинов RX/TX и скорости UART.
 
 ```cpp
-void setSmoothingFactor(float factor);
-void setMaxDistance(float distance);
-void setMinDistance(float distance);
-void setAngleFilter(float min_angle, float max_angle);
+void begin(int rx_pin, int tx_pin, long baud_rate = 256000);
+text
+
+### Конфигурация
 
 Методы для настройки параметров фильтрации и обработки данных.
 
-### Получение данных
-
+#### Коэффициент сглаживания
 ```cpp
+void setSmoothingFactor(float factor);
+text
 
-int getActiveTargetCount();
-float getTargetDistance(int index);
-float getTargetAngle(int index);
-float getTargetX(int index);
-float getTargetY(int index);
-float getTargetSpeedMs(int index);
-float getTargetSpeedKmh(int index);
-int getTargetID(int index);
+
 
 
 
