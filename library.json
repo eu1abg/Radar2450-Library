@@ -1,0 +1,29 @@
+{
+  "name": "Radar2450-Library",
+  "version": "1.0.0",
+  "keywords": ["radar", "LD2450", "hlk-ld2450", "sensor"],
+  "description": "Library for working with HLK-LD2450 radar sensor. Provides data parsing, configuration commands, and multi-target support.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/eu1abg/Radar2450-Library"
+  },
+  "authors": [
+    {
+      "name": "Aliaksandr Labada",
+      "email": "none",
+      "maintainer": true
+    }
+  ],
+  "frameworks": "arduino",
+  "platforms": "*",
+  "export": {
+    "include": [
+      "src",
+      "examples",
+      "README.md"
+    ]
+  },
+  "build": {
+    "srcDir": "src"
+  }
+}
