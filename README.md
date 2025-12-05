@@ -685,7 +685,8 @@ LD2450radar-Library/
 ├── library.properties    # Конфигурация Arduino IDE
 ├── library.json         # Конфигурация PlatformIO
 ├── LICENSE              # Лицензия MIT
-└── README.md            # Эта документация ```
+└── README.md            # Эта документация 
+```
 
 
 
