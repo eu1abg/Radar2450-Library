@@ -1,11 +1,11 @@
 {
-  "name": "Radar2450-Library",
+  "name": "LD2450radar",
   "version": "1.0.0",
-  "keywords": ["radar", "LD2450", "hlk-ld2450", "sensor"],
-  "description": "Library for working with HLK-LD2450 radar sensor. Provides data parsing, configuration commands, and multi-target support.",
+  "keywords": ["radar", "LD2450", "hlk-ld2450", "sensor", "tracking", "smoothing", "esp32"],
+  "description": "Library for HLK-LD2450 radar sensor. Provides data smoothing, target tracking, speed calculation. Requires HLK-LD245X library v0.9.1. Install: https://github.com/eu1abg/LD2450radar-Library.git",
   "repository": {
     "type": "git",
-    "url": "https://github.com/eu1abg/Radar2450-Library"
+    "url": "https://github.com/eu1abg/LD2450radar-Library.git"
   },
   "authors": [
     {
@@ -16,6 +16,9 @@
   ],
   "frameworks": "arduino",
   "platforms": "*",
+  "dependencies": {
+    "HLK-LD245X": "https://github.com/Fiooodooor/HLK-LD245X.git#0.9.1"
+  },
   "export": {
     "include": [
       "src",
