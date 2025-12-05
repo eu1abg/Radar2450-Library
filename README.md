@@ -554,14 +554,17 @@ int getActiveCount() // - количество активных целей (lost
 
 
 
-```cpp int getID(int n) - ID n-й активной цели 
+```cpp 
+int getID(int n) - ID n-й активной цели 
 
 ```
 
-```cpp float getDistance(int n) - дистанция (метры)
+```cpp 
+float getDistance(int n) - дистанция (метры)
  
 ```
-```cpp float getAngle(int n) - угол (градусы)
+```cpp 
+float getAngle(int n) - угол (градусы)
 
 ```
 
