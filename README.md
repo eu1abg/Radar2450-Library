@@ -121,6 +121,32 @@ LD2450radar radar(
     6.0f          // Средняя дистанция
 );
 ```
+#### 🔧 Дополнительные оптимизации
+
+```cpp
+// 1. Используйте прерывания для детектирования движения
+volatile bool motionDetected = false;
+
+// 2. Включите оптимизацию компилятора
+// В PlatformIO: build_flags = -O3
+// В Arduino: Меню → Инструменты → Оптимизация → "Быстрее"
+
+// 3. Используйте прямые регистры для вывода
+if (radar.getDistance(1) < 1.0f) {
+    GPIO.out_w1ts = (1 << LED_PIN); // Включить LED мгновенно
+}
+
+// 4. Кэшируйте часто используемые данные
+static float lastDistance = 0;
+float current = radar.getDistance(1);
+if (abs(current - lastDistance) > 0.1f) {
+    // Только если значительное изменение
+    processMovement();
+    lastDistance = current;
+}
+```
+
+
 # 🎯 Примеры использования
 
 
@@ -174,29 +200,255 @@ if (radar.getTargetMoving(1) && radar.getTargetSpeedKmh(1) > 2.0) {
 
 ### 4. Направленное управление
 ```cpp
-float angle = radar.getTargetAngle(1);
-if (angle < -30) {
-    turnLeft();   // Цель слева
-} else if (angle > 30) {
-    turnRight();  // Цель справа
-} else {
-    moveForward(); // Цель прямо
+#include <LD2450radar.h>
+
+LD2450radar radar(Serial1, 16, 17, 256000, 2, 0.2f, 4.0f);
+
+// Счётчики
+int peopleIn = 0;    // Вошли
+int peopleOut = 0;   // Вышли
+int totalInside = 0; // Сейчас внутри
+
+// Пороги
+#define ENTER_THRESHOLD 0.7f   // Порог входа
+#define EXIT_THRESHOLD 2.3f    // Порог выхода
+#define MIN_SPEED 0.2f         // Минимальная скорость для учета
+
+// Трекер положения
+float lastX = 0, lastY = 0;
+unsigned long lastUpdate = 0;
+bool wasInside = false;
+
+void setup() {
+    Serial.begin(115200);
+    radar.begin();
+    pinMode(LED_IN_PIN, OUTPUT);
+    pinMode(LED_OUT_PIN, OUTPUT);
+    Serial.println("Система подсчета с направлением");
+}
+
+void loop() {
+    radar.update();
+    
+    if (radar.getActiveCount() > 0) {
+        float x = radar.getX(1);
+        float y = radar.getY(1);
+        float speed = radar.getSpeed(1);
+        
+        // Расстояние до радара
+        float distance = sqrt(x*x + y*y);
+        
+        // Определяем положение относительно порогов
+        bool isInside = distance < ENTER_THRESHOLD;
+        bool isOutside = distance > EXIT_THRESHOLD;
+        
+        // Определение направления по изменению координат
+        if (lastUpdate > 0 && millis() - lastUpdate < 100) {
+            float dx = x - lastX;
+            float dy = y - lastY;
+            
+            // Приближение (dy отрицательно при движении вперед от радара)
+            // В нашей системе Y - направление вперед от радара
+            if (abs(speed) > MIN_SPEED) {
+                if (!wasInside && isInside && dy < 0) {
+                    // ВХОД: был снаружи, теперь внутри, движется "вглубь"
+                    peopleIn++;
+                    totalInside++;
+                    Serial.printf("ВХОД! Вошли: %d, Сейчас внутри: %d\n", 
+                                 peopleIn, totalInside);
+                    digitalWrite(LED_IN_PIN, HIGH);
+                    delay(300);
+                    digitalWrite(LED_IN_PIN, LOW);
+                    wasInside = true;
+                }
+                else if (wasInside && isOutside && dy > 0) {
+                    // ВЫХОД: был внутри, теперь снаружи, движется "наружу"
+                    peopleOut++;
+                    if (totalInside > 0) totalInside--;
+                    Serial.printf("ВЫХОД! Вышли: %d, Сейчас внутри: %d\n", 
+                                 peopleOut, totalInside);
+                    digitalWrite(LED_OUT_PIN, HIGH);
+                    delay(300);
+                    digitalWrite(LED_OUT_PIN, LOW);
+                    wasInside = false;
+                }
+            }
+        }
+        
+        // Сохраняем для следующего сравнения
+        lastX = x;
+        lastY = y;
+        lastUpdate = millis();
+    }
+    
+    // Периодический вывод статистики
+    static unsigned long lastReport = 0;
+    if (millis() - lastReport > 5000) {
+        Serial.println("=== СТАТИСТИКА ===");
+        Serial.printf("Вошли: %d\n", peopleIn);
+        Serial.printf("Вышли: %d\n", peopleOut);
+        Serial.printf("Сейчас внутри: %d\n", totalInside);
+        Serial.printf("Баланс: %d\n", peopleIn - peopleOut);
+        Serial.println("================");
+        lastReport = millis();
+    }
+    
+    delay(50);
 }
 ```
 
 ### 5. Подсчет проходящих людей
 ```cpp
-static int peopleCount = 0;
-static float lastDistance = 0;
+#include <LD2450radar.h>
 
-float currentDistance = radar.getTargetDistance(1);
-if (currentDistance < 1.0 && lastDistance > 2.0) {
-    peopleCount++;
-    Serial.printf("Прошел человек. Всего: %d\n", peopleCount);
+LD2450radar radar(Serial1, 16, 17, 256000, 5, 0.15f, 4.0f);
+
+// Переменные для подсчёта
+static int peopleCount = 0;
+static float lastDistance = 0.0f;
+static unsigned long lastDetectionTime = 0;
+
+void setup() {
+    Serial.begin(115200);
+    radar.begin();
+    Serial.println("Система подсчета людей запущена");
 }
-lastDistance = currentDistance;
+
+void loop() {
+    radar.update();
+    
+    if (radar.getActiveCount() > 0) {
+        float currentDistance = radar.getDistance(1); // Ближайшая цель
+        
+        // Логика обнаружения прохода:
+        // 1. Сначала цель была далеко (>2м)
+        // 2. Потом приблизилась близко (<1м)
+        if (currentDistance < 1.0f && lastDistance > 2.0f) {
+            // Защита от двойного срабатывания (дебаунс)
+            if (millis() - lastDetectionTime > 2000) { // Не чаще 1 раза в 2 секунды
+                peopleCount++;
+                Serial.printf("Прошел человек! Всего: %d\n", peopleCount);
+                lastDetectionTime = millis();
+                
+                // Можно добавить звуковой/световой сигнал
+                digitalWrite(BUZZER_PIN, HIGH);
+                delay(100);
+                digitalWrite(BUZZER_PIN, LOW);
+            }
+        }
+        
+        lastDistance = currentDistance;
+    }
+    
+    delay(50); // ~20 Гц
+}
 ```
-### 5.⏱️ Пример кода с минимальной задержкой
+### 5.1 🎯 Улучшенная версия с зонами
+```cpp #include <LD2450radar.h>
+
+LD2450radar radar(Serial1, 16, 17, 256000, 3, 0.1f, 5.0f);
+
+// Состояния для отслеживания
+enum PersonState {
+    OUTSIDE,    // Человек вне зоны
+    ENTERING,   // Входит в зону
+    INSIDE,     // Внутри зоны
+    EXITING     // Выходит из зоны
+};
+
+PersonState currentState = OUTSIDE;
+int peopleCount = 0;
+unsigned long stateChangeTime = 0;
+
+// Зоны обнаружения (в метрах)
+#define FAR_ZONE 2.5f    // Дальняя зона
+#define NEAR_ZONE 0.8f   // Ближняя зона
+#define HYSTERESIS 0.2f  // Гистерезис для устранения дребезга
+
+void setup() {
+    Serial.begin(115200);
+    radar.begin();
+    Serial.println("Система подсчета людей (улучшенная)");
+}
+
+void loop() {
+    radar.update();
+    
+    if (radar.getActiveCount() > 0) {
+        float dist = radar.getDistance(1);
+        float speed = radar.getSpeed(1);
+        
+        // Машина состояний для точного отслеживания
+        switch (currentState) {
+            case OUTSIDE:
+                if (dist < FAR_ZONE && dist > NEAR_ZONE) {
+                    currentState = ENTERING;
+                    stateChangeTime = millis();
+                    Serial.println("Обнаружено приближение...");
+                }
+                break;
+                
+            case ENTERING:
+                if (dist <= NEAR_ZONE) {
+                    currentState = INSIDE;
+                    stateChangeTime = millis();
+                } else if (dist > FAR_ZONE + HYSTERESIS) {
+                    currentState = OUTSIDE; // Отошёл
+                }
+                break;
+                
+            case INSIDE:
+                if (dist > NEAR_ZONE + HYSTERESIS) {
+                    currentState = EXITING;
+                    stateChangeTime = millis();
+                }
+                break;
+                
+            case EXITING:
+                if (dist > FAR_ZONE) {
+                    // УСПЕШНОЕ завершение прохода
+                    peopleCount++;
+                    Serial.printf("Человек прошел! Всего: %d\n", peopleCount);
+                    currentState = OUTSIDE;
+                    
+                    // Визуальная индикация
+                    blinkLED(3);
+                } else if (dist < NEAR_ZONE - HYSTERESIS) {
+                    // Вернулся обратно - отмена
+                    currentState = INSIDE;
+                    Serial.println("Отмена: человек вернулся");
+                }
+                break;
+        }
+        
+        // Защита от зависаний (таймаут состояния)
+        if (millis() - stateChangeTime > 10000) { // 10 секунд
+            currentState = OUTSIDE;
+        }
+    }
+    
+    // Вывод текущего состояния каждые 2 секунды
+    static unsigned long lastPrint = 0;
+    if (millis() - lastPrint > 2000) {
+        Serial.printf("Состояние: %d, Людей сегодня: %d\n", 
+                     currentState, peopleCount);
+        lastPrint = millis();
+    }
+    
+    delay(40); // 25 Гц
+}
+
+void blinkLED(int times) {
+    for (int i = 0; i < times; i++) {
+        digitalWrite(LED_PIN, HIGH);
+        delay(150);
+        digitalWrite(LED_PIN, LOW);
+        delay(150);
+    }
+}
+```
+
+### 6.⏱️ Пример кода с минимальной задержкой
 
 ```cpp
 #include <LD2450radar.h>
@@ -248,9 +500,7 @@ void triggerFastAction() {
 }
 ```
 
-### 6. 
-
-🚀 Итоговый рецепт "Максимальная скорость"
+### 7.🚀 Итоговый рецепт "Максимальная скорость"
 
 ```cpp
 // АБСОЛЮТНЫЙ МИНИМУМ ЗАДЕРЖКИ
