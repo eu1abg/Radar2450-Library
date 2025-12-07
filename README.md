@@ -75,6 +75,18 @@ LD2450radar(HardwareSerial &serial, int rxPin, int txPin,
             unsigned long baud = 256000, int maxTargets = 10,
             float alpha = 0.1f, float maxDistM = 10.0f);
 
+// Параметры по умолчанию (alpha=0.1f, maxDistM=10.0f)
+LD2450radar radar(Serial1, 4, 5);
+
+// С пользовательскими параметрами
+LD2450radar radar(Serial1, 4, 5, 256000, 10, 0.2f, 10.0f);
+
+// Только чтобы изменить alpha, остальные по умолчанию:
+LD2450radar radar(Serial1, 4, 5, 256000, 10, 0.2f, 10.0f);
+
+// или если вас устраивают остальные значения по умолчанию:
+LD2450radar radar(Serial1, 4, 5, 256000, 10, 0.2f);
+
 ```
 
 
@@ -709,6 +721,7 @@ LD2450radar-Library/
 ## 📄 Лицензия
 
 MIT License. Подробности в файле [LICENSE.](https://github.com/eu1abg/LD2450radar-Library/blob/main/MIT%20License.txt)
+
 
 
 
